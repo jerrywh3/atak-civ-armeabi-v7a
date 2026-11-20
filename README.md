@@ -24,7 +24,9 @@ elevation and heading.
 | `libtakengine.so` is ELF 32-bit ARM | **yes** |
 | Installs, launches, survives first run | **yes**, on the S42 — default (LiDAR) variant |
 | Plugins load; map engine reports position | **yes** |
-| Sustained map use, GPS fix, TAK server connection | **not tested** |
+| Enrolls with a TAK server and stays connected | yes - OpenTAKServer 1.7.13, mTLS on 8089 |
+| Reports its position | yes - GPS fix, 1.0-1.6 m reported accuracy |
+| Sustained map use over hours, plugin behaviour | **not tested** |
 | Any device other than the Cat S42 | **not tested** |
 | `arm64-v8a` or `x86` | not attempted — the point here was v7a |
 
