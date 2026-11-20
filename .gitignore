@@ -1,0 +1,14 @@
+# Never commit build output. The APK in particular must not be redistributed:
+# it bundles proprietary PGSC video, MrSID and pdfium libraries.
+*.apk
+*.aar
+*.so
+*.a
+out/
+src/
+las-build/
+conan-home/
+gradle-home/
+m2/
+*.log
+__pycache__/

@@ -1,0 +1,211 @@
+--- a/takkernel/engine/CMakeLists.txt
++++ b/takkernel/engine/CMakeLists.txt
+@@ -16,6 +16,13 @@
+                   LANGUAGES C CXX)
+ 
+ option(BUILD_JNI "Build JNI into the library" ON)
++option(TAK_WITH_LAS "Build LiDAR .las/.laz point cloud support (needs libLAS)" ON)
++if(TAK_WITH_LAS)
++    set(TAK_LAS_CONAN_REQ libLAS/1.8.2f)
++    add_compile_definitions(TAK_WITH_LAS=1)
++else()
++    set(TAK_LAS_CONAN_REQ)
++endif()
+ 
+ include(${CMAKE_CURRENT_SOURCE_DIR}/../engine/cmake/support/Config.cmake)
+ include(${CMAKE_CURRENT_SOURCE_DIR}/../engine/cmake/support/conan.cmake)
+@@ -28,7 +35,7 @@
+                             tinygltf-tak/2.4.1
+                             tinygltfloader-tak/0.9.5
+                             ttp-dist/4.2.4
+-                            libLAS/1.8.2f
++                            ${TAK_LAS_CONAN_REQ}
+                             draco/1.5.7
+                             cesium-native/0.40.1
+                           GENERATORS
+@@ -39,7 +46,7 @@
+                             tinygltf-tak/2.4.1
+                             tinygltfloader-tak/0.9.5
+                             ttp-dist/4.2.4
+-                            libLAS/1.8.2f
++                            ${TAK_LAS_CONAN_REQ}
+                             draco/1.5.7
+                             cesium-native/0.40.1
+                           GENERATORS
+@@ -114,7 +121,9 @@
+ find_package (tinygltf-tak)
+ find_package (tinygltfloader-tak)
+ find_package (ttp-dist)
+-find_package (libLAS)
++if(TAK_WITH_LAS)
++    find_package (libLAS)
++endif()
+ find_package (draco)
+ if(NOT ANDROID)
+     find_package (GLES-stub)
+--- a/takkernel/engine/src/main/cpp/cmake/CommonSources.cmake
++++ b/takkernel/engine/src/main/cpp/cmake/CommonSources.cmake
+@@ -1,6 +1,14 @@
+ # Support script for mapengine/CMakeLists.txt that sets sources, definitions, includes, link libraries, link directories,
+ # and compiler options that are used for all platform targets.
+ 
++if(TAK_WITH_LAS)
++    set(TAK_LAS_FORMAT_SRCS ${SRC_DIR}/formats/las/LAS.cpp)
++    set(TAK_LAS_MODEL_SRCS ${SRC_DIR}/model/LASSceneInfoSpi.cpp ${SRC_DIR}/model/LASSceneSpi.cpp)
++else()
++    set(TAK_LAS_FORMAT_SRCS)
++    set(TAK_LAS_MODEL_SRCS)
++endif()
++
+ set(takengine_COMMON_INCS
+     ${SRC_DIR}
+     ${khronos_INCLUDE_DIRS}
+@@ -242,7 +250,7 @@
+ )
+ 
+ set (takengine_formats_las_COMMON_SRCS
+-    ${SRC_DIR}/formats/las/LAS.cpp
++    ${TAK_LAS_FORMAT_SRCS}
+ )
+ 
+ set (takengine_formats_mbtiles_COMMON_SRCS
+@@ -375,8 +383,7 @@
+     ${SRC_DIR}/model/DAESceneInfoSpi.cpp
+     ${SRC_DIR}/model/Georeferencer.cpp
+     ${SRC_DIR}/model/KMZSceneInfoSpi.cpp
+-    ${SRC_DIR}/model/LASSceneInfoSpi.cpp
+-    ${SRC_DIR}/model/LASSceneSpi.cpp
++    ${TAK_LAS_MODEL_SRCS}
+     ${SRC_DIR}/model/Material.cpp
+     ${SRC_DIR}/model/Mesh.cpp
+     ${SRC_DIR}/model/MeshBuilder.cpp
+--- a/takkernel/engine/src/main/cpp/cmake/AndroidSources.cmake
++++ b/takkernel/engine/src/main/cpp/cmake/AndroidSources.cmake
+@@ -1,3 +1,9 @@
++if(TAK_WITH_LAS)
++    set(TAK_LAS_LIBS las las_c)
++else()
++    set(TAK_LAS_LIBS)
++endif()
++
+ # Support script for mapengine/CMakeLists.txt that sets sources, definitions, includes, link libraries, link directories,
+ # and compiler options that are specific to Android targets.
+ 
+@@ -166,8 +172,7 @@
+     log
+     GLESv3
+ 
+-    las
+-    las_c
++    ${TAK_LAS_LIBS}
+ 	draco
+ 
+ 	# System
+--- a/takkernel/engine/src/main/jni/jsceneinfofactory.cpp
++++ b/takkernel/engine/src/main/jni/jsceneinfofactory.cpp
+@@ -7,8 +7,10 @@
+ #include <model/ContextCaptureSceneSpi.h>
+ #include <model/DAESceneInfoSpi.h>
+ #include <model/KMZSceneInfoSpi.h>
++#ifdef TAK_WITH_LAS
+ #include <model/LASSceneInfoSpi.h>
+ #include <model/LASSceneSpi.h>
++#endif // TAK_WITH_LAS
+ #include <model/OBJSceneInfoSpi.h>
+ #include <model/Pix4dGeoreferencer.h>
+ #include "port/STLVectorAdapter.h"
+@@ -61,13 +63,17 @@
+ #if C3DT_ENABLED
+     c3dtinfospi = new std::shared_ptr<TAK::Engine::Model::SceneInfoSpi>(new TAK::Engine::Model::Cesium3DTilesSceneInfoSpi());
+ #endif
++#ifdef TAK_WITH_LAS
+     lasinfospi = new std::shared_ptr<TAK::Engine::Model::SceneInfoSpi>(new TAK::Engine::Model::LASSceneInfoSpi());
++#endif // TAK_WITH_LAS
+     assimpscenespi = new std::shared_ptr<TAK::Engine::Model::SceneSpi>(new TAK::Engine::Model::ASSIMPSceneSpi());
+     ccscenespi = new std::shared_ptr<TAK::Engine::Model::SceneSpi>(new TAK::Engine::Model::ContextCaptureSceneSpi());
+ #if C3DT_ENABLED
+     c3dtscenespi = new std::shared_ptr<TAK::Engine::Model::SceneSpi>(new TAK::Engine::Model::Cesium3DTilesSceneSpi());
+ #endif
++#ifdef TAK_WITH_LAS
+     lasscenespi = new std::shared_ptr<TAK::Engine::Model::SceneSpi>(new TAK::Engine::Model::LASSceneSPI());
++#endif // TAK_WITH_LAS
+ }
+ 
+ ImplGlobals::~ImplGlobals()
+@@ -86,8 +92,10 @@
+     TAK::Engine::Model::SceneInfoFactory_unregisterSpi(*ImplGlobals::c3dtinfospi);
+     delete ImplGlobals::c3dtinfospi;
+ #endif
++#ifdef TAK_WITH_LAS
+     TAK::Engine::Model::SceneInfoFactory_unregisterSpi(*ImplGlobals::lasinfospi);
+     delete ImplGlobals::lasinfospi;
++#endif // TAK_WITH_LAS
+     TAK::Engine::Model::SceneFactory_unregisterSpi(*ImplGlobals::assimpscenespi);
+     delete ImplGlobals::assimpscenespi;
+     TAK::Engine::Model::SceneFactory_unregisterSpi(*ImplGlobals::ccscenespi);
+@@ -96,8 +104,10 @@
+     TAK::Engine::Model::SceneFactory_unregisterSpi(*ImplGlobals::c3dtscenespi);
+     delete ImplGlobals::c3dtscenespi;
+ #endif
++#ifdef TAK_WITH_LAS
+     TAK::Engine::Model::SceneFactory_unregisterSpi(*ImplGlobals::lasscenespi);
+     delete ImplGlobals::lasscenespi;
++#endif // TAK_WITH_LAS
+ }
+ 
+ namespace {
+@@ -124,7 +134,9 @@
+ #if C3DT_ENABLED
+     TAK::Engine::Model::SceneFactory_registerSpi(*implGlobals->c3dtscenespi);
+ #endif
++#ifdef TAK_WITH_LAS
+     TAK::Engine::Model::SceneFactory_registerSpi(*implGlobals->lasscenespi);
++#endif // TAK_WITH_LAS
+     TAK::Engine::Model::SceneInfoFactory_registerSpi(*implGlobals->objinfospi);
+     TAK::Engine::Model::SceneInfoFactory_registerSpi(*implGlobals->daeinfospi);
+     TAK::Engine::Model::SceneInfoFactory_registerSpi(*implGlobals->kmzinfospi);
+@@ -132,7 +144,9 @@
+     TAK::Engine::Model::SceneInfoFactory_registerSpi(*implGlobals->c3dtinfospi);
+ #endif
+     TAK::Engine::Model::SceneInfoFactory_registerSpi(*implGlobals->ccinfospi);
++#ifdef TAK_WITH_LAS
+     TAK::Engine::Model::SceneInfoFactory_registerSpi(*implGlobals->lasinfospi);
++#endif // TAK_WITH_LAS
+     TAK::Engine::Model::SceneInfoFactory_registerGeoreferencer(*implGlobals->pix4dgeoref);
+ //    TAK::Engine::Model::SceneInfoFactory_registerGeoreferencer(*implGlobals->contextCaptureGeoreferencer);
+     atexit(ImplGlobals_cleanup);
+--- a/takkernel/engine/build.gradle
++++ b/takkernel/engine/build.gradle
+@@ -6,7 +6,7 @@
+         conanPath = "${project.getProperty(project, 'conan.dir', null)}${File.separator}conan"
+     }
+     path 'CMakeLists.txt'
+-    arguments  "-DANDROID_STL=c++_static", "-DANDROID_ARM_NEON=ON", "-DCONAN_COMMAND=${conanPath}"
++    arguments  "-DANDROID_STL=c++_static", "-DANDROID_ARM_NEON=ON", "-DCONAN_COMMAND=${conanPath}", "-DTAK_WITH_LAS=${((project.findProperty('withLas') ?: 'true').toString() != 'false') ? 'ON' : 'OFF'}"
+     cFlags "-D__GXX_EXPERIMENTAL_CXX0X__", '-DBOOST_NO_AUTO_PTR'
+     cppFlags "-fexceptions", "-frtti"
+     buildTarget 'install'
+@@ -63,7 +63,9 @@
+         testImplementation("org.j3d:j3d-geom:${j3dVersion}")
+     } else if(isAndroidKernelBuild) {
+         api("gov.tak.thirdparty:takthirdparty:${takthirdpartyVersion}@aar")
+-        api("gov.tak.thirdparty:libLAS:${libLasVersion}@aar")
++        if ((project.findProperty('withLas') ?: 'true').toString() != 'false') {
++            api("gov.tak.thirdparty:libLAS:${libLasVersion}@aar")
++        }
+ 
+         androidTestImplementation("gov.tak.support:android-app-stl:12.1.2977051b@aar")
+     }
+--- a/takkernel/aarbundle/build.gradle
++++ b/takkernel/aarbundle/build.gradle
+@@ -8,7 +8,9 @@
+     
+     dependencies {
+         api("gov.tak.thirdparty:takthirdparty:${takthirdpartyVersion}@aar")
+-        api("gov.tak.thirdparty:libLAS:${libLasVersion}@aar")
++        if ((project.findProperty('withLas') ?: 'true').toString() != 'false') {
++            api("gov.tak.thirdparty:libLAS:${libLasVersion}@aar")
++        }
+         api("org.greenrobot:eventbus:${eventbusVersion}")
+         api("io.github.missioncommand:mil-sym-android-renderer:${milSymRendererAndroid}")
+         api("io.github.missioncommand:mil-sym-android:${milSymAndroid}") {
