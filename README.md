@@ -22,7 +22,7 @@ elevation and heading.
 | Builds end to end from a clean tree | **yes**, reproduced twice (with and without LiDAR) |
 | `aapt` reports `native-code: 'armeabi-v7a'` only | **yes** |
 | `libtakengine.so` is ELF 32-bit ARM | **yes** |
-| Installs, launches, survives first run | **yes**, on the S42 |
+| Installs, launches, survives first run | **yes**, on the S42 — default (LiDAR) variant |
 | Plugins load; map engine reports position | **yes** |
 | Sustained map use, GPS fix, TAK server connection | **not tested** |
 | Any device other than the Cat S42 | **not tested** |
@@ -188,11 +188,18 @@ patch makes it a build-time switch rather than a requirement:
 
 It adds a `TAK_WITH_LAS` CMake option (**default ON**, so the unpatched behaviour is the
 default), guards the LAS format and model sources and the JNI entry points behind it, and
-drops the libLAS AAR dependency when the flag is off. Without LiDAR the APK is about 9 MB
-smaller and the whole LASzip/libLAS stage can be skipped.
+drops the libLAS AAR dependency when the flag is off.
 
-Both variants are built and both work. The patch is offered because "I do not need point
-clouds" is a reasonable position for a small phone, not because libLAS is a problem.
+What it actually saves is **the build stage, not the download**. `liblas.so` and
+`liblas_c.so` are 1.8 MB uncompressed, about 250 KB of APK — the engine is marginally
+*larger* without LAS, so the net difference is small. The reason to use the switch is to
+skip the LASzip/libLAS stage of the build entirely, which is the fiddliest part of the
+chain.
+
+Verified on the built artifacts: the `-PwithLas=false` APK contains no `liblas.so`, and
+`readelf -d` on its `libtakengine.so` shows no `NEEDED` entry for `liblas.so` or
+`liblas_c.so`, where the default build has both. **Only the default (LiDAR) variant has
+been run on a phone**; the no-LAS variant is verified as built, not as running.
 
 ---
 
